@@ -7,7 +7,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { parseFrontmatter, parseBlocks, renderBlocks, escapeHtml } = require('./render');
+const { parseFrontmatter, parseBlocks, parseItems, renderBlocks, escapeHtml } = require('./render');
+const aeo = require('./aeo');
 const styles = require('./styles');
 const { themeCss } = require('./themes');
 const mcp = require('./mcp');
@@ -104,6 +105,7 @@ function page(meta, bodyHtml, siteName, opts = {}) {
 <title>${escapeHtml(title)}</title>
 ${desc ? `<meta name="description" content="${escapeHtml(desc)}">` : ''}
 ${canonical ? `<link rel="canonical" href="${escapeHtml(canonical)}">` : ''}
+${opts.markdown ? '<link rel="alternate" type="text/markdown" href="/site.md">' : ''}
 ${noindex ? '<meta name="robots" content="noindex">' : ''}
 <meta property="og:type" content="website">
 <meta property="og:title" content="${escapeHtml(title)}">
@@ -111,6 +113,7 @@ ${desc ? `<meta property="og:description" content="${escapeHtml(desc)}">` : ''}
 ${canonical ? `<meta property="og:url" content="${escapeHtml(canonical)}">` : ''}
 ${image ? `<meta property="og:image" content="${escapeHtml(image)}">` : ''}
 <meta name="twitter:card" content="${image ? 'summary_large_image' : 'summary'}">
+${opts.jsonLd || ''}
 <style>${styles}</style>
 <style>${themeCss(meta.theme)}</style>
 </head>
@@ -198,11 +201,25 @@ const server = http.createServer((req, res) => {
 `);
   }
 
+  // The markdown is a second rendering of the same page, so it names the HTML
+  // as canonical — a search engine that finds both counts one page, not two.
+  const sourceHeaders = {
+    'Content-Type': 'text/markdown; charset=utf-8',
+    Link: `<${base}/>; rel="canonical"`
+  };
+
   // Serving the source verbatim is the point of the format, not a debug hatch:
   // an agent or an LLM reads the same text a human edits.
   if (url.pathname === '/site.md') {
-    res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8' });
+    res.writeHead(200, sourceHeaders);
     return res.end(fs.readFileSync(file));
+  }
+
+  // Where an agent looks first for the version of a site meant for it.
+  if (url.pathname === '/llms.txt') {
+    const { meta } = parseFrontmatter(fs.readFileSync(file, 'utf8'));
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    return res.end(aeo.llmsTxt({ meta, base, siteName: host }));
   }
 
   // A site is one page. Serving it at every path produced an unlimited supply
@@ -210,18 +227,29 @@ const server = http.createServer((req, res) => {
   // construction, and no way for anything to be genuinely missing.
   if (url.pathname !== '/') return notFound(req, res);
 
+  // An agent that asks for markdown gets the source at the page's own address.
+  // Vary tells a cache in front that the same URL has two answers.
+  if (aeo.wantsMarkdown(req.headers.accept)) {
+    res.writeHead(200, { ...sourceHeaders, Vary: 'Accept', 'Cache-Control': 'no-cache' });
+    return res.end(fs.readFileSync(file));
+  }
+
   try {
     const src = fs.readFileSync(file, 'utf8');
     const { meta, body } = parseFrontmatter(src);
     const isAdmin = admin.enabled() && admin.isLoggedIn(req);
-    const html = renderBlocks(parseBlocks(body), { isAdmin });
+    const blocks = parseBlocks(body);
+    const html = renderBlocks(blocks, { isAdmin });
     const editable = isAdmin
       ? `<a href="/admin/edit?host=${encodeURIComponent(path.basename(file, '.md'))}" style="position:fixed;right:1rem;bottom:1rem;z-index:9;background:#111;color:#fff;padding:.55rem 1rem;border-radius:999px;text-decoration:none;font:600 14px/1 ui-sans-serif,system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3)">Edit this page</a>`
       : '';
-    const host = siteNameFor(req.headers.host);
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
-    res.end(page(meta, html + editable, path.basename(file, '.md'), {
-      canonical: host ? `${scheme(req)}://${path.basename(file, '.md')}/` : ''
+    const requested = siteNameFor(req.headers.host);
+    const canonical = requested ? `${base}/` : '';
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', Vary: 'Accept' });
+    res.end(page(meta, html + editable, host, {
+      canonical,
+      markdown: true,
+      jsonLd: aeo.jsonLd({ meta, canonical, siteName: host, faqs: aeo.faqPairs(blocks, parseItems) })
     }));
   } catch (err) {
     console.error(`[render] ${file}: ${err.message}`);

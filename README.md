@@ -133,12 +133,14 @@ A link written `[Label](/where){.primary}` becomes a button (`.primary`,
 name costs you the layout, never the content.
 
 `GET /site.md` serves the source verbatim. That is the point of the format,
-not a debug hatch.
+not a debug hatch. *Answer engines and agents* below says how a machine finds
+it.
 
 ## Running it
 
 ```bash
 npm install && npm start          # http://localhost:8080
+npm test                          # node:test, no extra dependencies
 docker build -t lobby . && docker run -p 8080:8080 lobby
 ```
 
@@ -227,6 +229,24 @@ Frontmatter carries the rest:
 | `lang` | the `lang` attribute — set it, the default is `en` |
 | `image` | `og:image`, and upgrades the Twitter card to a large image |
 | `noindex: true` | keeps a site out of search results |
+| `organization` | an `Organization` in the page's JSON-LD, and the page's publisher |
+| `logo` | that organization's logo |
+
+## Answer engines and agents
+
+The words are already in the HTML, but an agent that wants the source can find
+it four ways. All of it comes from the one markdown file, so a site gains it
+without being edited.
+
+| What | Where |
+| --- | --- |
+| A link to the markdown | `<link rel="alternate" type="text/markdown" href="/site.md">` in every page's head |
+| `llms.txt` | `/llms.txt` names the site, gives its description, and links to `/site.md` ([llmstxt.org](https://llmstxt.org)) |
+| Content negotiation | `GET /` with `Accept: text/markdown` returns the markdown (`Vary: Accept`). A browser, or curl's `*/*`, still gets HTML |
+| Structured data | JSON-LD with a `WebPage`, an `Organization` when the frontmatter names one, and a `FAQPage` built from every `::faq` block |
+
+The markdown answers carry `Link: <https://host/>; rel="canonical"`, so a
+search engine that finds both versions counts one page.
 
 ## Notes
 

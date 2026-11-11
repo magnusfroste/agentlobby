@@ -304,4 +304,4 @@ function renderBlocks(blocks, ctx = {}) {
   }).join('\n');
 }
 
-module.exports = { parseFrontmatter, parseBlocks, renderBlocks, escapeHtml };
+module.exports = { parseFrontmatter, parseBlocks, parseItems, renderBlocks, escapeHtml };
