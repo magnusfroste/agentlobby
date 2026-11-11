@@ -5,29 +5,61 @@
 // list them, read one, write one, delete one. Anything more elaborate would be
 // inventing an API on top of a filesystem that already has one.
 //
+// The two that are not about files are about the format. An agent working
+// alone cannot see the page it wrote, so it is told what the format offers
+// (describe_format) and what is wrong with what it wrote (check_site, and the
+// warnings on every write), instead of learning by copying someone's page.
+//
 // Writing a site is publishing it, so the endpoint is off unless a token is
 // set. A world-writable CMS is not a default anyone should get by accident.
 
 const { listThemes } = require('./themes');
 const store = require('./store');
+const { lintSite } = require('./lint');
+const { BLOCKS, ALIASES, UNIVERSAL_ATTRS, TONES, FRONTMATTER, FONTS } = require('./blocks');
 
 const PROTOCOL = '2024-11-05';
 
+// Read by clients that show a server's instructions to their model. It is the
+// order of work that keeps an agent from guessing the format.
+const INSTRUCTIONS = `Lobby hosts landing pages: one markdown file per hostname.
+Before writing your first page, call describe_format: it lists every block, its attributes and fields, with examples, plus the themes.
+Write pages with write_site; read the warnings it returns and fix them. check_site gives the same review without saving.
+For variety across many pages, change the theme, accent and font in frontmatter, the order of blocks, and tone= bands — not only the words.`;
+
 const TOOLS = {
+  describe_format: {
+    description: 'The page format: frontmatter keys, every block with its attributes, list fields and a working example, the attributes every block takes, button syntax and themes. Call this before writing a page. Pass block to get one block only',
+    inputSchema: {
+      type: 'object',
+      properties: { block: { type: 'string', description: 'Optional. One block name, e.g. compare' } }
+    }
+  },
   list_sites: {
-    description: 'List every site this hotel serves. Each entry is a hostname and the markdown file behind it',
-    inputSchema: { type: 'object', properties: {} }
+    description: 'List the sites this Lobby serves: hostname, title, description, theme, tags, last update, URL and whether the hostname is routed here',
+    inputSchema: {
+      type: 'object',
+      properties: { tag: { type: 'string', description: 'Optional. Only sites whose frontmatter tags include this one' } }
+    }
   },
   read_site: {
-    description: "Read a site's markdown source, exactly as it is on disk",
+    description: "Read a site's markdown source, exactly as it is on disk, with its version",
     inputSchema: {
       type: 'object',
       properties: { host: { type: 'string', description: 'Hostname, e.g. acme.com' } },
       required: ['host']
     }
   },
+  check_site: {
+    description: 'Review a page without saving it: unknown blocks, attributes or fields, unclosed or nested blocks, missing title, description or alt text, broken #anchors. Returns warnings with line numbers and the block outline',
+    inputSchema: {
+      type: 'object',
+      properties: { content: { type: 'string', description: 'The complete markdown source' } },
+      required: ['content']
+    }
+  },
   write_site: {
-    description: 'Create or replace a site. The content is the whole file including frontmatter — this overwrites, it does not merge. Read it first if you mean to edit',
+    description: 'Create or replace a site. The content is the whole file including frontmatter — this overwrites, it does not merge. Read it first if you mean to edit. The reply has the URL and the same warnings as check_site; fix them and write again',
     inputSchema: {
       type: 'object',
       properties: {
@@ -52,6 +84,43 @@ const TOOLS = {
   }
 };
 
+function describeFormat(block) {
+  if (block) {
+    const name = ALIASES[block] || block;
+    const b = BLOCKS[name];
+    if (!b) return null;
+    return { block: name, ...b, universal_attrs: UNIVERSAL_ATTRS };
+  }
+  return {
+    file: 'Optional frontmatter between --- lines, then blocks. A block opens with ::name{attr="value" other=3} on its own line and closes with a line that is only ::. Blocks do not nest. Markdown outside a block is a text block.',
+    frontmatter: FRONTMATTER,
+    universal_attrs: UNIVERSAL_ATTRS,
+    tones: TONES,
+    fonts: Object.keys(FONTS),
+    lists: 'Blocks with fields take a markdown list: each item starts with "- field: value", and further fields of the same item are indented two spaces, "  field: value". Links in nav and footer are "- Label → /href".',
+    buttons: '[Label](https://…){.primary} or {.ghost} turns a link into a button, in hero, two-column, text, cta and banner.',
+    blocks: Object.fromEntries(Object.entries(BLOCKS).map(([name, b]) => [name, {
+      summary: b.summary,
+      attrs: b.attrs,
+      ...(b.items ? { fields: b.items } : { body: b.body }),
+      example: b.example
+    }])),
+    aliases: ALIASES,
+    themes: listThemes(),
+    tips: [
+      'Open with ::hero, close with ::cta and ::footer; put proof (stats, logos, testimonials, compare) in between.',
+      'Give a long page rhythm with tone=soft, tone=dark or tone=accent on every second or third block.',
+      'Give each campaign its own theme, accent colour and font, so pages for different audiences do not look alike.',
+      'Images must be full https:// URLs you know exist. With none, leave image out rather than inventing one.',
+      'Add tags: in frontmatter (e.g. "campaign, founders") so list_sites can find a group of pages later.'
+    ]
+  };
+}
+
+function siteUrl(host) {
+  return `https://${host}/`;
+}
+
 // The host becomes a filename, so it is validated rather than trusted — the
 // same rule the request path uses, for the same reason.
 function safeHost(host) {
@@ -66,8 +135,19 @@ function fail(message) { return { content: [{ type: 'text', text: JSON.stringify
 
 function callTool(name, args) {
   switch (name) {
-    case 'list_sites':
-      return ok({ sites: store.list(), domains: store.configuredDomains() });
+    case 'describe_format': {
+      const guide = describeFormat(args.block ? String(args.block).toLowerCase() : '');
+      return guide ? ok(guide) : fail(`No block "${args.block}". Blocks: ${Object.keys(BLOCKS).join(', ')}`);
+    }
+
+    case 'list_sites': {
+      const domains = store.configuredDomains();
+      const tag = String(args.tag || '').trim().toLowerCase();
+      const sites = store.list()
+        .filter(s => !tag || s.tags.includes(tag))
+        .map(s => ({ ...s, url: siteUrl(s.host), routed: store.isRouted(s.host, domains) }));
+      return ok({ sites, domains });
+    }
 
     case 'read_site': {
       const site = store.read(args.host);
@@ -77,11 +157,24 @@ function callTool(name, args) {
       return ok(site);
     }
 
+    case 'check_site':
+      return ok(lintSite(args.content));
+
     case 'write_site': {
       const result = store.write(args.host, args.content, args.if_version);
+      const review = lintSite(args.content);
+      const routed = store.isRouted(result.host);
       return ok({
         ...result,
-        note: result.created ? 'Created — point the hostname at this hotel to serve it' : 'Replaced'
+        url: siteUrl(result.host),
+        routed,
+        warnings: review.warnings,
+        outline: review.outline,
+        note: [
+          result.created ? 'Created.' : 'Replaced.',
+          routed === false ? 'The hostname is not routed to this Lobby yet, so the URL will not answer until it is.' : '',
+          review.warnings.length ? `${review.warnings.length} warning(s): fix them and write again.` : 'No warnings.'
+        ].filter(Boolean).join(' ')
       });
     }
 
@@ -117,6 +210,13 @@ function handle(req, res, body, { sitesDir, token }) {
     return res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }));
   }
 
+  // A notification has no id and wants no answer. The spec says 202 with an
+  // empty body; a JSON reply here is something a strict client may trip on.
+  if (rpc && rpc.id === undefined && typeof rpc.method === 'string' && rpc.method.startsWith('notifications/')) {
+    res.writeHead(202);
+    return res.end();
+  }
+
   const reply = (result) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ jsonrpc: '2.0', id: rpc.id ?? null, result }));
@@ -128,7 +228,8 @@ function handle(req, res, body, { sitesDir, token }) {
         return reply({
           protocolVersion: PROTOCOL,
           capabilities: { tools: {} },
-          serverInfo: { name: 'lobby', version: '0.2.0' }
+          serverInfo: { name: 'lobby', version: '0.3.0' },
+          instructions: INSTRUCTIONS
         });
       case 'tools/list':
         return reply({ tools: Object.entries(TOOLS).map(([name, t]) => ({ name, ...t })) });
@@ -140,8 +241,6 @@ function handle(req, res, body, { sitesDir, token }) {
           // server fault — say which version is current so it can re-read.
           return reply(fail(err.conflict ? `${err.message} (current version ${err.currentVersion})` : err.message));
         }
-      case 'notifications/initialized':
-        return reply({});
       default:
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({
@@ -155,4 +254,4 @@ function handle(req, res, body, { sitesDir, token }) {
   }
 }
 
-module.exports = { handle, TOOLS };
+module.exports = { handle, TOOLS, callTool, describeFormat, INSTRUCTIONS };

@@ -46,19 +46,28 @@ function list() {
     .map(f => {
       const full = path.join(dir, f);
       const st = fs.statSync(full);
+      const meta = metaOf(fs.readFileSync(full, 'utf8'));
       return {
         host: f.slice(0, -3),
         bytes: st.size,
         updated: st.mtime.toISOString(),
-        title: titleOf(fs.readFileSync(full, 'utf8'))
+        title: meta.title || '',
+        description: meta.description || '',
+        theme: meta.theme || 'default',
+        tags: tagsOf(meta)
       };
     })
     .sort((a, b) => a.host.localeCompare(b.host));
 }
 
-function titleOf(content) {
-  const m = /^\s*title:\s*(.+)$/m.exec(content.slice(0, 800));
-  return m ? m[1].trim().replace(/^["']|["']$/g, '') : '';
+// Required lazily: render.js requires this file, and the frontmatter parser
+// lives there so the page and the listing read a header the same way.
+function metaOf(content) {
+  return require('./render').parseFrontmatter(content).meta;
+}
+
+function tagsOf(meta) {
+  return String(meta.tags || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
 }
 
 function read(host) {

@@ -7,8 +7,16 @@
 
 const { marked } = require('marked');
 const store = require('./store');
+const { TONES, spec } = require('./blocks');
 
 marked.setOptions({ mangle: false, headerIds: false });
+// Every link and picture in markdown goes through the same gate as the ones in
+// block attributes, so [x](javascript:…) cannot ride in on plain prose.
+marked.use({
+  walkTokens(token) {
+    if (token.type === 'link' || token.type === 'image') token.href = safeUrl(token.href) || '#';
+  }
+});
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => (
@@ -40,29 +48,84 @@ function parseAttrs(raw) {
   return attrs;
 }
 
+// Each block remembers the line it opened on (counted within the body), so a
+// checker can say where a problem is instead of only what it is.
 function parseBlocks(body) {
   const blocks = [];
   const open = /^::([a-z][a-z0-9-]*)(\{[^\n]*\})?\s*$/im;
   let rest = body;
+  let consumed = 0;
+  const lineAt = offset => body.slice(0, offset).split('\n').length;
 
   while (rest.length) {
     const m = open.exec(rest);
-    if (!m) { pushText(blocks, rest); break; }
+    if (!m) { pushText(blocks, rest, lineAt(consumed)); break; }
 
-    pushText(blocks, rest.slice(0, m.index));
+    pushText(blocks, rest.slice(0, m.index), lineAt(consumed));
     const after = rest.slice(m.index + m[0].length);
     // A block ends at a line that is exactly "::". An unclosed block runs to
     // the end of the file rather than swallowing the page silently.
     const close = /^::\s*$/m.exec(after);
     const inner = close ? after.slice(0, close.index) : after;
-    blocks.push({ type: m[1].toLowerCase(), attrs: parseAttrs(m[2]), body: inner.trim() });
-    rest = close ? after.slice(close.index + close[0].length) : '';
+    const block = { type: m[1].toLowerCase(), attrs: parseAttrs(m[2]), body: inner.trim(), line: lineAt(consumed + m.index) };
+    if (!close) block.unclosed = true;
+    blocks.push(block);
+    const used = m.index + m[0].length + (close ? close.index + close[0].length : after.length);
+    consumed += used;
+    rest = rest.slice(used);
   }
   return blocks;
 }
 
-function pushText(blocks, text) {
-  if (text && text.trim()) blocks.push({ type: 'text', attrs: {}, body: text.trim() });
+function pushText(blocks, text, line) {
+  if (text && text.trim()) blocks.push({ type: 'text', attrs: {}, body: text.trim(), line, implicit: true });
+}
+
+// A URL an agent wrote ends up in src= or href=. Only web addresses, page
+// anchors, relative paths, mailto: and tel: get through; javascript: and data:
+// never do, whoever wrote the page.
+function safeUrl(u) {
+  const s = String(u || '').trim();
+  if (!s) return '';
+  if (/^(https?:\/\/|\/|#|\.\/|mailto:|tel:)/i.test(s)) return s;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(s)) return s;   // relative, e.g. "logo.png"
+  return '';
+}
+
+function heading(b) {
+  return b.attrs.title ? `<h2>${escapeHtml(b.attrs.title)}</h2>` : '';
+}
+
+function columns(b, fallback = 3) {
+  return Math.min(4, Math.max(2, parseInt(b.attrs.columns) || fallback));
+}
+
+function img(src, alt, cls = '') {
+  const url = safeUrl(src);
+  if (!url) return '';
+  return `<img${cls ? ` class="${cls}"` : ''} src="${escapeHtml(url)}" alt="${escapeHtml(alt || '')}" loading="lazy">`;
+}
+
+// yes/no in a comparison read faster as marks than as words.
+function compareCell(v) {
+  const t = String(v || '').trim();
+  if (/^(yes|y|true|✓|✔)$/i.test(t)) return '<span class="mark-yes" aria-label="yes">✓</span>';
+  if (/^(no|n|false|✗|✘|-|—)$/i.test(t)) return '<span class="mark-no" aria-label="no">✗</span>';
+  if (/^(partial|some|limited|~)$/i.test(t)) return '<span class="mark-partial">Partial</span>';
+  return inline(t);
+}
+
+// The players a video URL can be turned into. YouTube goes through its
+// no-cookie domain and Vimeo with do-not-track, so a landing page does not set
+// tracking cookies just by being opened.
+function videoEmbed(src) {
+  const s = String(src || '').trim();
+  let m = /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/.exec(s);
+  if (m) return { kind: 'iframe', url: `https://www.youtube-nocookie.com/embed/${m[1]}` };
+  m = /vimeo\.com\/(?:video\/)?(\d+)/.exec(s);
+  if (m) return { kind: 'iframe', url: `https://player.vimeo.com/video/${m[1]}?dnt=1` };
+  if (/^https?:\/\/\S+\.(mp4|webm|ogg)(\?\S*)?$/i.test(s)) return { kind: 'file', url: s };
+  return null;
 }
 
 // Links written as [label](/href){.primary} become buttons; the class marks
@@ -79,7 +142,7 @@ function extractActions(md) {
 function actionsHtml(actions) {
   if (!actions.length) return '';
   return `<p class="actions">${actions.map(a =>
-    `<a class="btn btn-${escapeHtml(a.kind)}" href="${escapeHtml(a.href)}">${escapeHtml(a.label)}</a>`
+    `<a class="btn btn-${escapeHtml(a.kind)}" href="${escapeHtml(safeUrl(a.href) || '#')}">${escapeHtml(a.label)}</a>`
   ).join('')}</p>`;
 }
 
@@ -138,7 +201,105 @@ const renderers = {
     const { actions, rest } = extractActions(b.body);
     const eyebrow = b.attrs.eyebrow
       ? `<p class="eyebrow">${escapeHtml(b.attrs.eyebrow)}</p>` : '';
-    return `<section class="block hero">${eyebrow}${md(rest)}${actionsHtml(actions)}</section>`;
+    const text = `${eyebrow}${md(rest)}${actionsHtml(actions)}`;
+    const picture = img(b.attrs.image, b.attrs.imageAlt);
+    if (!picture) return `<section class="block hero">${text}</section>`;
+    return `<section class="block hero hero-media"><div class="hero-text">${text}</div><div class="hero-picture">${picture}</div></section>`;
+  },
+
+  banner(b) {
+    const { actions, rest } = extractActions(b.body);
+    const buttons = actions.map(a =>
+      `<a class="btn btn-${escapeHtml(a.kind)}" href="${escapeHtml(safeUrl(a.href) || '#')}">${escapeHtml(a.label)}</a>`).join('');
+    return `<section class="block banner"><p>${inline(rest)}${buttons}</p></section>`;
+  },
+
+  cards(b) {
+    const cards = parseItems(b.body).map(i => {
+      const href = safeUrl(i.href);
+      const pic = img(i.image, i.alt, 'card-img');
+      const inner = `${pic}<div class="card-body">
+        ${i.tag ? `<p class="card-tag">${escapeHtml(i.tag)}</p>` : ''}
+        <h3>${escapeHtml(i.title || i.label || '')}</h3>
+        ${i.body ? `<p>${inline(i.body)}</p>` : ''}
+        ${i.cta ? `<p class="card-cta">${escapeHtml(i.cta)}</p>` : ''}
+      </div>`;
+      return href
+        ? `<a class="link-card" href="${escapeHtml(href)}">${inner}</a>`
+        : `<div class="link-card">${inner}</div>`;
+    }).join('');
+    return `<section class="block cards">${heading(b)}<div class="link-card-grid" style="--cols:${columns(b)}">${cards}</div></section>`;
+  },
+
+  steps(b) {
+    const rows = parseItems(b.body).map((i, n) => `<li class="step">
+      <span class="step-n">${n + 1}</span>
+      <div><h3>${escapeHtml(i.title || i.label || '')}</h3>${i.body ? `<p>${inline(i.body)}</p>` : ''}</div>
+    </li>`).join('');
+    return `<section class="block steps">${heading(b)}<ol class="step-list">${rows}</ol></section>`;
+  },
+
+  logos(b) {
+    const title = b.attrs.title ? `<p class="logos-title">${escapeHtml(b.attrs.title)}</p>` : '';
+    const items = parseItems(b.body).map(i => {
+      const name = i.name || i.label || '';
+      const mark = img(i.image, name, 'logo-img') || `<span class="logo-name">${escapeHtml(name)}</span>`;
+      const href = safeUrl(i.href);
+      return href ? `<a class="logo" href="${escapeHtml(href)}">${mark}</a>` : `<span class="logo">${mark}</span>`;
+    }).join('');
+    return `<section class="block logos">${title}<div class="logo-row">${items}</div></section>`;
+  },
+
+  testimonials(b) {
+    const cards = parseItems(b.body).map(i => {
+      const who = [i.by, i.role].filter(Boolean).map(escapeHtml).join(' · ');
+      return `<figure class="testimonial">
+        <blockquote>${inline(i.quote || i.label || '')}</blockquote>
+        ${who ? `<figcaption>${img(i.avatar, i.by, 'avatar')}<span>${who}</span></figcaption>` : ''}
+      </figure>`;
+    }).join('');
+    return `<section class="block testimonials">${heading(b)}<div class="testimonial-grid">${cards}</div></section>`;
+  },
+
+  compare(b) {
+    const cols = String(b.attrs.columns || '').split(',').map(s => s.trim()).filter(Boolean);
+    const hl = b.attrs.highlight === undefined ? 1 : parseInt(b.attrs.highlight) || 0;
+    const cls = n => (n === hl ? ' class="col-hl"' : '');
+    const head = cols.length
+      ? `<thead><tr><th></th>${cols.map((c, n) => `<th${cls(n + 1)}>${escapeHtml(c)}</th>`).join('')}</tr></thead>` : '';
+    const rows = parseItems(b.body).map(i => {
+      const values = String(i.values || '').split(';').map(v => v.trim());
+      const width = Math.max(cols.length, values.length);
+      const cells = Array.from({ length: width }, (_, n) => `<td${cls(n + 1)}>${compareCell(values[n])}</td>`).join('');
+      return `<tr><th scope="row">${inline(i.row || i.label || '')}</th>${cells}</tr>`;
+    }).join('');
+    return `<section class="block compare">${heading(b)}<div class="compare-wrap"><table class="compare-table">${head}<tbody>${rows}</tbody></table></div></section>`;
+  },
+
+  gallery(b) {
+    const figs = parseItems(b.body).map(i => {
+      const pic = img(i.image, i.alt);
+      if (!pic) return '';
+      return `<figure>${pic}${i.caption ? `<figcaption>${inline(i.caption)}</figcaption>` : ''}</figure>`;
+    }).join('');
+    return `<section class="block gallery">${heading(b)}<div class="gallery-grid" style="--cols:${columns(b)}">${figs}</div></section>`;
+  },
+
+  video(b) {
+    const v = videoEmbed(b.attrs.src);
+    const title = escapeHtml(b.attrs.title || 'Video');
+    let player = '';
+    if (v && v.kind === 'iframe') {
+      player = `<div class="video-frame"><iframe src="${escapeHtml(v.url)}" title="${title}" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
+    } else if (v) {
+      const poster = safeUrl(b.attrs.poster);
+      player = `<div class="video-frame"><video controls preload="metadata" src="${escapeHtml(v.url)}"${poster ? ` poster="${escapeHtml(poster)}"` : ''} title="${title}"></video></div>`;
+    } else if (safeUrl(b.attrs.src)) {
+      // Not a player we know: a link is still better than an empty box.
+      player = `<p><a class="btn btn-ghost" href="${escapeHtml(safeUrl(b.attrs.src))}">Watch the video</a></p>`;
+    }
+    const caption = b.body ? `<div class="video-caption">${md(b.body)}</div>` : '';
+    return `<section class="block video">${player}${caption}</section>`;
   },
 
   // "split" is markdownweb's name; "two-column" is the same thing said plainly.
@@ -146,9 +307,8 @@ const renderers = {
     const { actions, rest } = extractActions(b.body);
     const eyebrow = b.attrs.eyebrow
       ? `<p class="eyebrow">${escapeHtml(b.attrs.eyebrow)}</p>` : '';
-    const media = b.attrs.image
-      ? `<div class="split-media"><img src="${escapeHtml(b.attrs.image)}" alt="${escapeHtml(b.attrs.imageAlt || '')}" loading="lazy"></div>`
-      : '';
+    const picture = img(b.attrs.image, b.attrs.imageAlt);
+    const media = picture ? `<div class="split-media">${picture}</div>` : '';
     const flip = b.attrs.reverse === 'true' ? ' split-reverse' : '';
     return `<section class="block split${flip}">`
       + `<div class="split-text">${eyebrow}${md(rest)}${actionsHtml(actions)}</div>${media}</section>`;
@@ -168,10 +328,10 @@ const renderers = {
   // one strands the reader at the bottom.
   nav(b) {
     const brand = b.attrs.brand
-      ? `<a class="nav-brand" href="${escapeHtml(b.attrs.home || '/')}">${escapeHtml(b.attrs.brand)}</a>` : '';
+      ? `<a class="nav-brand" href="${escapeHtml(safeUrl(b.attrs.home) || '/')}">${escapeHtml(b.attrs.brand)}</a>` : '';
     const links = parseItems(b.body)
       .filter(i => i.label)
-      .map(i => `<a href="${escapeHtml(i.href || '#')}">${escapeHtml(i.label)}</a>`)
+      .map(i => `<a href="${escapeHtml(safeUrl(i.href) || '#')}">${escapeHtml(i.label)}</a>`)
       .join('');
     return `<nav class="site-nav"><div class="nav-inner">${brand}<div class="nav-links">${links}</div></div></nav>`;
   },
@@ -212,7 +372,7 @@ const renderers = {
       const feats = String(i.features || '').split(';').map(f => f.trim()).filter(Boolean)
         .map(f => `<li>${inline(f)}</li>`).join('');
       const cta = i.cta
-        ? `<p class="actions"><a class="btn ${i.featured === 'true' ? 'btn-primary' : 'btn-ghost'}" href="${escapeHtml(i.href || '#')}">${escapeHtml(i.cta)}</a></p>`
+        ? `<p class="actions"><a class="btn ${i.featured === 'true' ? 'btn-primary' : 'btn-ghost'}" href="${escapeHtml(safeUrl(i.href) || '#')}">${escapeHtml(i.cta)}</a></p>`
         : '';
       return `<div class="tier${i.featured === 'true' ? ' tier-featured' : ''}">
         <h3>${escapeHtml(i.name || '')}</h3>
@@ -238,7 +398,7 @@ const renderers = {
 
   footer(b) {
     const links = parseItems(b.body).filter(i => i.label)
-      .map(i => `<a href="${escapeHtml(i.href || '#')}">${escapeHtml(i.label)}</a>`).join('');
+      .map(i => `<a href="${escapeHtml(safeUrl(i.href) || '#')}">${escapeHtml(i.label)}</a>`).join('');
     return `<section class="block site-footer">
       <div class="footer-links">${links}</div>
       ${b.attrs.note ? `<p class="footer-note">${escapeHtml(b.attrs.note)}</p>` : ''}
@@ -295,13 +455,26 @@ const renderers = {
 
 renderers['two-column'] = renderers.split;
 
+// id, tone and align work on every block, so they are applied here once
+// rather than taught to each renderer.
+function decorate(html, b) {
+  const attrs = { ...((spec(b.type) || {}).defaults || {}), ...b.attrs };
+  const classes = [];
+  if (TONES.includes(attrs.tone) && attrs.tone !== 'plain') classes.push(`tone-${attrs.tone}`);
+  if (attrs.align === 'center') classes.push('align-center');
+  const id = /^[A-Za-z][A-Za-z0-9_-]*$/.test(attrs.id || '') ? attrs.id : '';
+  if (!classes.length && !id) return html;
+  return html.replace(/^<section class="block([^"]*)"/,
+    (_, cls) => `<section${id ? ` id="${escapeHtml(id)}"` : ''} class="block${cls}${classes.map(c => ' ' + c).join('')}"`);
+}
+
 function renderBlocks(blocks, ctx = {}) {
   return blocks.map(b => {
     const fn = renderers[b.type];
     // An unknown directive renders as text rather than vanishing. A typo in a
     // block name should cost you the layout, never the words.
-    return fn ? fn(b, ctx) : renderers.text(b, ctx);
+    return decorate(fn ? fn(b, ctx) : renderers.text(b, ctx), b);
   }).join('\n');
 }
 
-module.exports = { parseFrontmatter, parseBlocks, parseItems, renderBlocks, escapeHtml };
+module.exports = { parseFrontmatter, parseBlocks, parseItems, renderBlocks, escapeHtml, safeUrl, videoEmbed, renderers };

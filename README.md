@@ -77,18 +77,39 @@ Every batch is pull-tested and stamped.
 
 | Directive | What it is |
 | --- | --- |
-| `::hero` | The opening statement, with call-to-action links |
+| `::banner` | A thin announcement strip, accent-coloured by default |
+| `::nav` | Sticky header. `brand=` names it, list items are `Label → /href` or `Label → #anchor` |
+| `::hero` | The opening statement, with call-to-action links. `image=` puts a picture beside it |
 | `::two-column` | Text beside an image. `reverse=true` flips it. Alias: `::split` |
-| `::cta` | A boxed invitation, centred |
 | `::text` | Everything else |
-| `::nav` | Sticky header. `brand=` names it, list items are `Label → /href` |
 | `::features` | Grid of icon, title and body. `columns=2..4` |
+| `::cards` | Link cards with optional picture, tag and call to action |
+| `::steps` | Numbered steps: how it works, getting started |
 | `::stats` | A row of numbers with labels |
+| `::logos` | A row of names or logos: works with, trusted by |
 | `::quote` | A pull quote. `by=` and `role=` attribute it |
+| `::testimonials` | Several quotes as cards, with optional avatars |
+| `::compare` | A comparison table; `yes`/`no` become ✓ and ✗, one column highlighted |
 | `::pricing` | Tiers as cards. `features:` is semicolon-separated, `featured: true` highlights one |
+| `::gallery` | A grid of pictures with captions |
+| `::video` | YouTube (no-cookie), Vimeo (do-not-track) or a direct `.mp4`/`.webm` |
 | `::faq` | Question and answer pairs, rendered as native `<details>` |
+| `::cta` | A boxed invitation, centred |
 | `::footer` | Link row plus a `note=` line |
 | `::sites` | A card for every site this hotel serves. `title=` heads it, `hide=` omits hostnames |
+
+Every block also takes three attributes:
+
+| Attribute | Effect |
+| --- | --- |
+| `id=pricing` | An anchor, so `[Prices](#pricing)` or a nav item `- Prices → #pricing` jumps to it |
+| `tone=soft`, `dark`, `accent` | Paints the block as a full-width band. Alternating tones is what gives a long page rhythm |
+| `align=center` | Centres headings, text and buttons |
+
+The whole reference — every block's attributes, list fields and a working
+example — is in [`blocks.js`](blocks.js), which is also what the renderer, the
+checker and the `describe_format` tool read. [`examples/showcase.example.com.md`](examples/showcase.example.com.md)
+uses every block once.
 
 Blocks that hold several records take them as markdown lists, so the file still
 reads as prose:
@@ -175,6 +196,9 @@ the same page in different colours and an agent picking one is guessing.
 | `brutalist` | Heavy rules above every block, no rounded corners |
 | `warm` | Pill buttons and a tinted hero |
 | `midnight` | Dark by default, glowing hairline under the hero |
+| `aurora` | Deep violet night, gradient headline over an aurora-lit hero, glassy cards |
+| `swiss` | Oversized tight headlines, signal red, a red square before every section heading |
+| `playful` | Candy pastels and chunky outlines; hard offset shadows make buttons and cards look like stickers |
 
 ## Admin
 
@@ -198,8 +222,28 @@ work; your text stays in the editor so you can decide.
 ## MCP — letting an agent run the hotel
 
 `POST /mcp` speaks JSON-RPC 2.0 with a bearer token, the same shape as
-AgentHotel's own endpoint. Five tools, because a site is a file:
-`list_sites`, `read_site`, `write_site`, `delete_site`, `list_themes`.
+AgentHotel's own endpoint.
+
+| Tool | What it does |
+| --- | --- |
+| `describe_format` | The format itself: frontmatter keys, every block with its attributes, fields and an example, the attributes every block takes, themes. Pass `block` for one |
+| `check_site` | Reviews a page without saving it, with line numbers |
+| `write_site` | Creates or replaces a site. Answers with the URL, whether the hostname is routed here, and the same warnings as `check_site` |
+| `read_site` | The source and its version, for a write that refuses to clobber |
+| `list_sites` | Every site with title, description, theme, tags, URL and routing. `tag` filters |
+| `delete_site` | Removes one |
+| `list_themes` | Themes with their one-line signature |
+
+An agent working alone cannot see the page it wrote. Without these it learned
+the format by copying someone else's page, published probe pages to see what
+rendered, and never found out that a misspelt field had been ignored. The
+checker reports unknown blocks, attributes and fields (with the likely name),
+unclosed and nested blocks, `#anchors` that point nowhere, duplicate ids,
+missing title, description and alt text, and comparison rows of the wrong
+width. It never refuses a write: the renderer stays forgiving for visitors,
+the author is told.
+
+`initialize` carries `instructions` that put `describe_format` first.
 
 ```json
 {
@@ -239,6 +283,10 @@ Frontmatter carries the rest:
 | `noindex: true` | keeps a site out of search results |
 | `organization` | an `Organization` in the page's JSON-LD, and the page's publisher |
 | `logo` | that organization's logo |
+| `theme` | one of the themes above |
+| `accent` | `#rgb` or `#rrggbb`, overriding the theme's accent; the button text picks black or white to stay readable |
+| `font` | `sans`, `serif`, `mono` or `rounded`, overriding the theme's typeface |
+| `tags` | comma-separated labels, e.g. `campaign, founders`; `list_sites` filters on them |
 
 ## Answer engines and agents
 

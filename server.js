@@ -10,7 +10,7 @@ const path = require('path');
 const { parseFrontmatter, parseBlocks, parseItems, renderBlocks, escapeHtml } = require('./render');
 const aeo = require('./aeo');
 const styles = require('./styles');
-const { themeCss } = require('./themes');
+const { siteCss } = require('./themes');
 const mcp = require('./mcp');
 const admin = require('./admin');
 const store = require('./store');
@@ -110,7 +110,7 @@ ${image ? `<meta property="og:image" content="${escapeHtml(image)}">` : ''}
 <meta name="twitter:card" content="${image ? 'summary_large_image' : 'summary'}">
 ${opts.jsonLd || ''}
 <style>${styles}</style>
-<style>${themeCss(meta.theme)}</style>
+<style>${siteCss(meta)}</style>
 </head>
 <body>
 <main>
