@@ -66,6 +66,10 @@ table { width:100%; border-collapse:collapse; }
 th, td { text-align:left; padding:.7rem .6rem; border-bottom:1px solid var(--line); vertical-align:top; }
 th { font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:600; }
 td.host { font-family:ui-monospace,Menlo,Consolas,monospace; }
+td.host a { text-decoration:none; }
+td.host a:hover { text-decoration:underline; }
+td.act { text-align:right; white-space:nowrap; }
+td.act .btn { padding:.3rem .8rem; font-size:.82rem; }
 .tag { display:inline-block; font-size:.72rem; padding:.12rem .5rem; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
 .tag.live { color:#34d399; border-color:#34d39955; }
 .tag.nodomain { color:#fbbf24; border-color:#fbbf2455; }
@@ -121,11 +125,17 @@ function listPage() {
       : live === null ? ''
       : live ? '<span class="tag live">live</span>'
              : '<span class="tag nodomain">not routed</span>';
+    // The hostname is the site, so it opens the site; editing is the button.
+    // An unrouted name has nothing to open, so it stays plain text.
+    const host = live === false
+      ? esc(s.host)
+      : `<a href="https://${esc(s.host)}/" target="_blank" rel="noreferrer">${esc(s.host)} ↗</a>`;
     return `<tr>
-      <td class="host"><a href="/admin/edit?host=${encodeURIComponent(s.host)}">${esc(s.host)}</a></td>
+      <td class="host">${host}</td>
       <td>${esc(s.title)}</td>
       <td>${tag}</td>
       <td class="note">${(s.bytes / 1024).toFixed(1)} kB · ${esc(s.updated.slice(0, 16).replace('T', ' '))}</td>
+      <td class="act"><a class="btn ghost" href="/admin/edit?host=${encodeURIComponent(s.host)}">Edit</a></td>
     </tr>`;
   }).join('');
 
@@ -137,12 +147,13 @@ function listPage() {
   const missing = domains.filter(d => !d.startsWith('*.') && !haveFile.has(d)).map(d => `<tr>
       <td class="host">${esc(d)}</td><td class="note">routed here, no file yet</td>
       <td><span class="tag nofile">no file</span></td>
-      <td><a class="btn ghost" href="/admin/edit?host=${encodeURIComponent(d)}&amp;new=1">Create</a></td>
+      <td></td>
+      <td class="act"><a class="btn ghost" href="/admin/edit?host=${encodeURIComponent(d)}&amp;new=1">Create</a></td>
     </tr>`).join('');
 
   return shell('Sites', `
     <table>
-      <tr><th>Hostname</th><th>Title</th><th></th><th>Size · updated</th></tr>
+      <tr><th>Hostname</th><th>Title</th><th></th><th>Size · updated</th><th></th></tr>
       ${rows}${missing}
     </table>
     <div class="row">
