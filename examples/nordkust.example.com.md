@@ -3,7 +3,7 @@ title: "Nordkust Bageri — surdeg sedan 1997"
 description: "Surdegsbageri i Göteborg sedan 1997. Tre dagars jäsning, stenugn, färskt varje morgon."
 lang: sv
 theme: warm
-footer: "Nordkust Bageri · nordkust.pezcms.com.md"
+footer: "Nordkust Bageri · nordkust.example.com.md"
 ---
 
 ::hero{eyebrow="third guest, same container"}
