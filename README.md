@@ -1,7 +1,12 @@
-# Lobby
+# AgentLobby
 
 **A hotel for landing pages.** One process, many domains — each site is a
 single markdown file.
+
+Part of [AgentHotel](https://github.com/magnusfroste/agenthotel), where it is
+the **Lobby** template. Its sibling
+[AgentPages](https://github.com/magnusfroste/agentpages) gives an agent a link
+to what it built; AgentLobby gives it a front door on your own domains.
 
 ```
 acme.com       → sites/acme.com.md
@@ -238,14 +243,14 @@ Frontmatter carries the rest:
 
 ## Running it on AgentHotel
 
-Lobby is built to be checked in as a guest of
-[AgentHotel](https://github.com/magnusfroste/agenthotel): pick the **Git App**
-runtime, give it this repository, port `8080`, and a health check path of
-`/healthz`. Set `DOMAIN_ALIASES` to `*.example.com` and the panel writes the
+AgentLobby is built to be checked in as a guest of
+[AgentHotel](https://github.com/magnusfroste/agenthotel): deploy the **Lobby**
+template, or pick the **Git App** runtime, give it this repository, port
+`8080`, and a health check path of `/healthz`. Set `DOMAIN_ALIASES` to `*.example.com` and the panel writes the
 wildcard route for you; it also passes `AGENTHOTEL_DOMAINS` in, which is what
 lets the admin tell a live site from an unrouted one.
 
-Nothing here depends on it — Lobby is an ordinary container with two
+Nothing here depends on it — AgentLobby is an ordinary container with two
 environment variables and a volume.
 
 ## Credits
