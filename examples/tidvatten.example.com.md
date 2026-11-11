@@ -31,7 +31,7 @@ theme: midnight
   label: Snittbetyg i personalappen
 ::
 
-::features{columns=3 title="Det som tar tid, automatiserat" }
+::features{columns=3 title="Det som tar tid, automatiserat"}
 - icon: ⚖️
   title: Reglerna hålls åt dig
   body: Elva timmars dygnsvila, veckovila, max fem pass i rad. Systemet säger ifrån *innan* du publicerar, inte efteråt när någon redan planerat sin vecka.
@@ -52,8 +52,8 @@ theme: midnight
   body: Varje ändring loggas med vem, när och varför. Praktiskt när facket frågar.
 ::
 
-::two-column{image="https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=1200&q=80" imageAlt="En kalender på ett skrivbord" eyebrow="problemet"}
-## Excel klarar inte vilotid {#funktioner}
+::two-column{id=funktioner image="https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=1200&q=80" imageAlt="En kalender på ett skrivbord" eyebrow="problemet"}
+## Excel klarar inte vilotid
 
 Reglerna är inte svåra — de är bara omöjliga att hålla i huvudet samtidigt
 som du försöker få ihop tjugo personers önskemål.
@@ -68,7 +68,7 @@ efteråt. Nu är det gjort före lunch, och jag har slutat drömma om
 tolvtimmarspass.
 ::
 
-::pricing{title="Priser" }
+::pricing{id=priser title="Priser"}
 - name: Liten
   price: 39 kr
   period: /anställd/mån
@@ -93,7 +93,7 @@ tolvtimmarspass.
   href: mailto:foretag@tidvatten.se
 ::
 
-::faq{title="Vanliga frågor" }
+::faq{id=faq title="Vanliga frågor"}
 - q: Måste alla anställda ha appen?
   a: Nej. Schemat går att skriva ut och skicka som PDF, och den som vill kan få det på mejl istället. Skiftbyten kräver dock appen för att fungera utan mellanhand.
 - q: Hur lång är bindningstiden?
@@ -106,8 +106,8 @@ tolvtimmarspass.
   a: Ja. Nattpass, delade turer och jour hanteras, och dygnsbrytet går att flytta.
 ::
 
-::cta
-## Fjorton dagar, hela funktionen {#prova}
+::cta{id=prova}
+## Fjorton dagar, hela funktionen
 
 Ingen betalning, inget kort, ingen säljare som ringer. Lägg ett riktigt
 schema och se om det håller.

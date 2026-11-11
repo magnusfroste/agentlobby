@@ -14,8 +14,8 @@ footer: "Sjöberg Tak AB · skapad över MCP utan en enda konfigurationsändring
 [Boka fri besiktning](#kontakt){.primary} [Se referenser](#jobb){.ghost}
 ::
 
-::two-column{image="https://images.unsplash.com/photo-1632759145351-1d592919f522?w=1200&q=80" imageAlt="Ett tegeltak" eyebrow="arbeten"}
-## Vi lämnar inget halvfärdigt {#jobb}
+::two-column{id=jobb image="https://images.unsplash.com/photo-1632759145351-1d592919f522?w=1200&q=80" imageAlt="Ett tegeltak" eyebrow="arbeten"}
+## Vi lämnar inget halvfärdigt
 
 Omläggning, byte av underlagspapp, nya hängrännor och snörasskydd. Vi
 plockar undan efter oss samma dag och kör bort det gamla materialet.
@@ -23,10 +23,11 @@ plockar undan efter oss samma dag och kör bort det gamla materialet.
 Tio års garanti på arbetet, och vi finns kvar för att infria den.
 ::
 
-::cta
-## Fri besiktning i hela Bohuslän {#kontakt}
+::cta{id=kontakt}
+## Fri besiktning i hela Bohuslän
 
 Vi kommer ut, klättrar upp och säger som det är — även när svaret är att
 taket håller tio år till.
 
 [0522-123 45](tel:+4652212345){.primary}
+::

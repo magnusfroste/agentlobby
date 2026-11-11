@@ -2,7 +2,7 @@ FROM node:22-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev
-COPY server.js render.js aeo.js styles.js themes.js mcp.js admin.js store.js ./
+COPY server.js render.js aeo.js styles.js themes.js mcp.js admin.js store.js blocks.js lint.js ./
 # Sites live on a volume so a redeploy never takes the content with it.
 VOLUME ["/sites"]
 ENV SITES_DIR=/sites PORT=8080

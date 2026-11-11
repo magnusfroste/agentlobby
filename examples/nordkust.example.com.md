@@ -14,8 +14,8 @@ footer: "Nordkust Bageri · nordkust.example.com.md"
 [Se sortimentet](#brod){.primary} [Hitta hit](#hitta){.ghost}
 ::
 
-::two-column{image="https://images.unsplash.com/photo-1509440159596-0249088772ff?w=1200&q=80" imageAlt="Nybakade bröd på ett galler" eyebrow="hantverket"}
-## Bara mjöl, vatten, salt {#brod}
+::two-column{id=brod image="https://images.unsplash.com/photo-1509440159596-0249088772ff?w=1200&q=80" imageAlt="Nybakade bröd på ett galler" eyebrow="hantverket"}
+## Bara mjöl, vatten, salt
 
 Ingen jäst, inga tillsatser, ingen deg som går snabbare än den ska. Levainen
 är från 1997 och matas varje dag.
@@ -23,8 +23,8 @@ Ingen jäst, inga tillsatser, ingen deg som går snabbare än den ska. Levainen
 Vi bakar sex sorter dagligen och två som byter med säsongen.
 ::
 
-::text
-## Öppettider {#hitta}
+::text{id=hitta}
+## Öppettider
 
 Tisdag till fredag 07–17, lördag 08–14. Stängt söndag och måndag, för
 någon måste sova när degen jäser.
