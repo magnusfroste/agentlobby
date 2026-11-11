@@ -10,17 +10,17 @@ footer: "Lobby · running on AgentHotel · source at /site.md"
 
 ## Point a hostname at this container, drop in a markdown file, and it is a website. The text you edit is the text a language model reads.
 
-[Read this page's source](/site.md){.primary} [See the other guest](https://lobby.pezcms.com){.ghost}
+[Read this page's source](/site.md){.primary} [See the other guest](https://lobby.example.com){.ghost}
 ::
 
 ::two-column{eyebrow="the whole trick" image="https://images.unsplash.com/photo-1481277542470-605612bd2d61?w=1200&q=80" imageAlt="A hotel corridor with numbered doors"}
 ## The doorplate is the domain
 
-This page and the one at **lobby.pezcms.com** are served by the same process,
+This page and the one at **lobby.example.com** are served by the same process,
 the same port and the same container. The only thing that differs is the
 `Host` header on the request.
 
-`lobby.pezcms.com` is `sites/lobby.pezcms.com.md`. That is the entire routing
+`lobby.example.com` is `sites/lobby.example.com.md`. That is the entire routing
 rule, and it is the same rule the hotel already uses to find a guest.
 ::
 

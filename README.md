@@ -144,6 +144,14 @@ npm test                          # node:test, no extra dependencies
 docker build -t lobby . && docker run -p 8080:8080 lobby
 ```
 
+A deploy starts with no sites: the admin lists each routed hostname with a
+**Create** button that opens a starter page. To browse the example sites in
+[`examples/`](examples) locally:
+
+```bash
+SITES_DIR=examples DEFAULT_SITE=example.com npm start
+```
+
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `PORT` | `8080` | Port to listen on |
@@ -209,8 +217,8 @@ Writing a site publishes it, so the endpoint stays closed until
 get by accident. `write_site` replaces the whole file rather than merging, so
 read before you edit.
 
-Files in the image's `/seed` are copied into `SITES_DIR` only when a name is
-missing, so a redeploy never overwrites a site you have edited.
+The image ships no sites, so nothing an operator deletes comes back on a
+redeploy, and no example sits under a hostname they do not own.
 
 ## SEO
 

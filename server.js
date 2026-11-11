@@ -16,7 +16,6 @@ const admin = require('./admin');
 const store = require('./store');
 
 const SITES_DIR = process.env.SITES_DIR || path.join(__dirname, 'sites');
-const SEED_DIR = '/seed';
 const PORT = parseInt(process.env.PORT) || 8080;
 // Unknown hostnames answer 404. A catch-all is available by naming a file in
 // DEFAULT_SITE, but it is not the default behaviour: with a wildcard route
@@ -27,16 +26,12 @@ const DEFAULT_SITE = process.env.DEFAULT_SITE || '';
 // operator sets a token. Absent one there is nothing to guess at.
 const API_TOKEN = process.env.LOBBY_API_TOKEN || '';
 
-// The sites folder is a volume, so it starts empty on a fresh deploy. Copying
-// the seed in only when a name is missing means an edited site is never
-// overwritten by a redeploy.
-function seedSites() {
+// A fresh deploy starts with no sites. Example sites under hostnames the
+// operator does not own would only confuse them, and a seed copied in on every
+// start would bring back a site they had deleted. The admin offers a starter
+// page for each routed hostname instead; examples/ in the repo shows the blocks.
+function ensureSitesDir() {
   if (!fs.existsSync(SITES_DIR)) fs.mkdirSync(SITES_DIR, { recursive: true });
-  if (!fs.existsSync(SEED_DIR)) return;
-  for (const name of fs.readdirSync(SEED_DIR)) {
-    const dest = path.join(SITES_DIR, name);
-    if (!fs.existsSync(dest)) fs.copyFileSync(path.join(SEED_DIR, name), dest);
-  }
 }
 
 // A hostname reaches the filesystem, so it is treated as hostile: lowercased,
@@ -258,7 +253,7 @@ const server = http.createServer((req, res) => {
   }
 });
 
-seedSites();
+ensureSitesDir();
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`markdown-hotel listening on ${PORT}, sites in ${SITES_DIR}`);
 });
