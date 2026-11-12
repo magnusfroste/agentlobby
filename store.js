@@ -88,15 +88,7 @@ function write(host, content, ifVersion) {
 
   const file = fileFor(safe);
   const existed = fs.existsSync(file);
-  if (ifVersion && existed) {
-    const current = versionOf(fs.readFileSync(file, 'utf8'));
-    if (current !== ifVersion) {
-      const err = new Error('This site changed since you read it');
-      err.conflict = true;
-      err.currentVersion = current;
-      throw err;
-    }
-  }
+  if (ifVersion && existed) refuseIfStale(versionOf(fs.readFileSync(file, 'utf8')), ifVersion);
 
   fs.mkdirSync(sitesDir(), { recursive: true });
   // Write beside the target and rename. A reader never sees half a file, and a
@@ -105,6 +97,51 @@ function write(host, content, ifVersion) {
   fs.writeFileSync(tmp, content);
   fs.renameSync(tmp, file);
   return { host: safe, created: !existed, bytes: Buffer.byteLength(content), version: versionOf(content) };
+}
+
+function refuseIfStale(current, ifVersion) {
+  if (current === ifVersion) return;
+  const err = new Error('This site changed since you read it');
+  err.conflict = true;
+  err.currentVersion = current;
+  throw err;
+}
+
+// A small edit without the caller holding the whole file: set frontmatter
+// keys, replace one exact piece of text, or both (the text first). Sending
+// nine kilobytes to shorten one sentence is slow, and every resend is a chance
+// to drop a line somewhere else in the page.
+//
+// The text to replace must occur exactly once. None means the caller is
+// working from a copy that is stale or misremembered; several means it has
+// not said which one. Guessing in either case would publish an edit nobody
+// asked for, so both are refused with the reason.
+function patch(host, { frontmatter, old, new: replacement } = {}, ifVersion) {
+  const site = read(host);
+  if (!site) return null;
+  if (ifVersion) refuseIfStale(site.version, ifVersion);
+
+  const keys = frontmatter === undefined ? null : frontmatter;
+  if (keys !== null && (typeof keys !== 'object' || Array.isArray(keys) || !Object.keys(keys).length)) {
+    throw new Error('frontmatter must be an object of keys to set, e.g. {"description": "…"}');
+  }
+  const replacing = old !== undefined || replacement !== undefined;
+  if (!keys && !replacing) throw new Error('Nothing to change: give frontmatter keys to set, or old and new text');
+
+  let content = site.content;
+  if (replacing) {
+    if (typeof old !== 'string' || !old) throw new Error('old must be the exact text to replace');
+    if (typeof replacement !== 'string') throw new Error('new must be the text to put in its place; "" removes the old text');
+    const matches = content.split(old).length - 1;
+    if (matches === 0) throw new Error('old was not found. It must match the file exactly, spaces and line breaks included — read_site shows the source');
+    if (matches > 1) throw new Error(`old occurs ${matches} times. Include more of the text around it so it matches once`);
+    content = content.replace(old, () => replacement);
+  }
+  if (keys) content = require('./render').setFrontmatter(content, keys);
+
+  if (content === site.content) return { host: site.host, changed: false, bytes: Buffer.byteLength(content), version: site.version, content };
+  const { created, ...saved } = write(site.host, content);
+  return { ...saved, changed: true, content };
 }
 
 function remove(host) {
@@ -161,4 +198,4 @@ function fallbackSite() {
   return process.env.DEFAULT_SITE || '';
 }
 
-module.exports = { list, read, write, remove, safeHost, versionOf, sitesDir, configuredDomains, isRouted, fallbackSite };
+module.exports = { list, read, write, patch, remove, safeHost, versionOf, sitesDir, configuredDomains, isRouted, fallbackSite };
