@@ -1,17 +1,13 @@
 // One stylesheet, inlined into every page. No build step, no external request,
-// nothing to cache-bust — the page is one document that renders on arrival.
+//
+// The base colours are the default theme's, taken from themes.js rather than
+// written out again, so the palette an agent is told about over MCP cannot
+// drift from the one in the page.
+const { THEMES, paletteCss } = require('./themes');
+
 module.exports = `
-:root {
-  --bg: #ffffff; --fg: #16181d; --muted: #5b6472; --line: #e5e8ee;
-  --accent: #4f46e5; --accent-fg: #ffffff; --soft: #f6f7fb;
-  --measure: 68ch; --wide: 1080px;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e1014; --fg: #e8eaef; --muted: #9aa4b2; --line: #262b34;
-    --accent: #8b87ff; --accent-fg: #14121f; --soft: #171b22;
-  }
-}
+${paletteCss(THEMES.default)}
+:root { --measure: 68ch; --wide: 1080px; }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body {

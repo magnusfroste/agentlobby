@@ -2,8 +2,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 const { parseBlocks, renderBlocks, safeUrl, videoEmbed, renderers } = require('../render');
-const { BLOCKS, ALIASES } = require('../blocks');
-const { siteCss } = require('../themes');
+const crypto = require('node:crypto');
+const { FORMAT, BLOCKS, ALIASES, UNIVERSAL_ATTRS, TONES, ALIGNS, FRONTMATTER, FONTS, BUTTON_KINDS } = require('../blocks');
+const { THEMES, siteCss, themeCss, listThemes } = require('../themes');
+const styles = require('../styles');
+const { TOOLS } = require('../mcp');
 
 const render = src => renderBlocks(parseBlocks(src));
 
@@ -101,4 +104,71 @@ test('accent and font override the theme, and the button text stays readable', (
   assert.doesNotMatch(siteCss({ accent: 'red; } body { display:none' }), /display:none/);
   assert.match(siteCss({ font: 'serif' }), /body \{ font-family: ui-serif/);
   assert.doesNotMatch(siteCss({ font: 'comic' }), /font-family: comic/);
+});
+
+// Where a theme's palette is written: the base stylesheet for the default
+// theme, the theme's own CSS for the rest.
+const paletteSource = name => (name === 'default' ? styles : siteCss({ theme: name }));
+
+test('the colours an agent is told are the colours in the stylesheet', () => {
+  for (const t of listThemes()) {
+    const [unconditional, forDark = ''] = paletteSource(t.name).split('@media (prefers-color-scheme: dark)');
+    const schemes = Object.keys(t.colors);
+    assert.ok(['light,dark', 'both'].includes(schemes.join()), `${t.name}: ${schemes}`);
+    for (const [scheme, c] of Object.entries(t.colors)) {
+      for (const [role, hex] of Object.entries(c)) assert.match(hex, /^#[0-9a-f]{6}$/, `${t.name} ${scheme} ${role}`);
+      const rule = new RegExp(`:root \\{ --bg: ${c.background}; --fg: ${c.text};[^}]*--accent: ${c.accent};`);
+      // The light or only palette is unconditional; the dark one sits behind
+      // the media query.
+      assert.match(scheme === 'dark' ? forDark : unconditional, rule, `${t.name} ${scheme} palette is not in the CSS`);
+    }
+  }
+  // The base stylesheet takes the default theme's palette from the same table.
+  assert.ok(styles.includes(`--bg: ${THEMES.default.light.bg};`) && styles.includes(`--bg: ${THEMES.default.dark.bg};`));
+});
+
+test('a theme that ignores the visitor\'s colour scheme says so, and only those do', () => {
+  for (const t of listThemes()) {
+    const fixed = !!t.colors.both;
+    assert.strictEqual(/both colour schemes/.test(t.description), fixed, `${t.name}: "${t.description}"`);
+    if (fixed) assert.doesNotMatch(themeCss(t.name), /prefers-color-scheme/, `${t.name} changes with the colour scheme`);
+  }
+});
+
+test('midnight is dark for every visitor', () => {
+  const midnight = listThemes().find(t => t.name === 'midnight');
+  assert.deepStrictEqual(midnight.colors, { both: { background: '#0a0f16', text: '#dfe7f0', accent: '#22d3ee' } });
+  assert.doesNotMatch(midnight.description, /by default/);
+  assert.strictEqual(siteCss({ theme: 'midnight' }).match(/--bg:/g).length, 1);
+});
+
+test('the format version is the newest entry in its list of changes', () => {
+  assert.strictEqual(FORMAT.changes[0].version, FORMAT.version);
+  FORMAT.changes.forEach((c, i) => {
+    assert.strictEqual(c.version, FORMAT.version - i, 'changes are newest first, one entry per version');
+    assert.match(c.date, /^\d{4}-\d{2}-\d{2}$/);
+    assert.ok(c.changed.length && c.changed.every(line => typeof line === 'string' && line.length > 10));
+  });
+});
+
+// Everything an agent can name: blocks, attributes, fields, frontmatter keys,
+// themes and tools. Wording is left out, so fixing a typo in a description
+// does not count as a new version.
+const SHAPE = '2:32d7f4228aca';
+
+test('the format cannot change without a new version', () => {
+  const shape = crypto.createHash('sha256').update(JSON.stringify({
+    blocks: Object.entries(BLOCKS).map(([name, b]) => [name, Object.keys(b.attrs), Object.keys(b.items || {})]),
+    aliases: ALIASES,
+    universal: Object.keys(UNIVERSAL_ATTRS),
+    tones: TONES,
+    aligns: ALIGNS,
+    frontmatter: Object.keys(FRONTMATTER),
+    fonts: Object.keys(FONTS),
+    buttons: BUTTON_KINDS,
+    themes: listThemes().map(t => [t.name, Object.keys(t.colors)]),
+    tools: Object.entries(TOOLS).map(([name, t]) => [name, Object.keys(t.inputSchema.properties)])
+  })).digest('hex').slice(0, 12);
+  assert.strictEqual(`${FORMAT.version}:${shape}`, SHAPE,
+    `What an agent can use has changed. Raise FORMAT.version in blocks.js, add an entry to FORMAT.changes saying what is new, then set SHAPE in this test to '${FORMAT.version}:${shape}'.`);
 });

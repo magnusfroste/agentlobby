@@ -5,42 +5,42 @@
 // guessing. With it, "editorial" means a drop cap and "brutalist" means hard
 // edges and no radius — something you can describe in one sentence and
 // recognise at a glance.
+//
+// The palettes are data, not CSS text, because two readers need them: the
+// stylesheet, and an agent choosing an accent for a page it cannot see. Both
+// are built from the objects below, so the colours an agent is told are the
+// colours a visitor gets. A theme with `light` and `dark` follows the
+// visitor's colour scheme; a theme with only one of them looks the same in
+// both.
 
 const { FONTS } = require('./blocks');
 
 const THEMES = {
   default: {
     description: 'Clean sans-serif, indigo accent. Signature: none — the neutral baseline.',
-    css: ''
+    light: { bg: '#ffffff', fg: '#16181d', muted: '#5b6472', line: '#e5e8ee', accent: '#4f46e5', accentFg: '#ffffff', soft: '#f6f7fb' },
+    dark: { bg: '#0e1014', fg: '#e8eaef', muted: '#9aa4b2', line: '#262b34', accent: '#8b87ff', accentFg: '#14121f', soft: '#171b22' }
   },
 
   editorial: {
     description: 'Serif headlines, generous measure, cream paper. Signature: drop cap on the first paragraph after a heading.',
-    css: `
-      --bg: #fbfaf7; --fg: #1c1a17; --muted: #6b645b; --line: #e6e0d6;
-      --accent: #9a3412; --accent-fg: #fff8f2; --soft: #f4f0e8;
-      --measure: 62ch;
-    `,
+    light: { bg: '#fbfaf7', fg: '#1c1a17', muted: '#6b645b', line: '#e6e0d6', accent: '#9a3412', accentFg: '#fff8f2', soft: '#f4f0e8' },
+    dark: { bg: '#17150f', fg: '#ece6da', muted: '#a49a89', line: '#2f2a20', accent: '#f0a071', accentFg: '#1a1209', soft: '#201c15' },
     extra: `
+      :root { --measure: 62ch; }
       body { font-family: ui-serif, Georgia, "Times New Roman", serif; }
       h1, h2, h3 { font-weight: 500; letter-spacing: -0.015em; }
       .block.text > p:first-of-type::first-letter {
         float: left; font-size: 3.1em; line-height: .84; padding: .05em .08em 0 0;
         font-weight: 600; color: var(--accent);
       }
-      @media (prefers-color-scheme: dark) {
-        :root { --bg: #17150f; --fg: #ece6da; --muted: #a49a89; --line: #2f2a20;
-                --accent: #f0a071; --accent-fg: #1a1209; --soft: #201c15; }
-      }
     `
   },
 
   brutalist: {
     description: 'Monospace, black on white, hard borders, no rounded corners. Signature: heavy rules above every block.',
-    css: `
-      --bg: #ffffff; --fg: #000000; --muted: #444444; --line: #000000;
-      --accent: #0000ee; --accent-fg: #ffffff; --soft: #f2f2f2;
-    `,
+    light: { bg: '#ffffff', fg: '#000000', muted: '#444444', line: '#000000', accent: '#0000ee', accentFg: '#ffffff', soft: '#f2f2f2' },
+    dark: { bg: '#000000', fg: '#ffffff', muted: '#aaaaaa', line: '#ffffff', accent: '#7ce3ff', accentFg: '#000000', soft: '#111111' },
     extra: `
       body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
       h1, h2, h3 { letter-spacing: -0.03em; text-transform: uppercase; }
@@ -49,55 +49,38 @@ const THEMES = {
       .btn, .cta-inner, img, pre, code { border-radius: 0; }
       .btn { border-width: 2px; }
       .cta-inner { border-width: 3px; }
-      @media (prefers-color-scheme: dark) {
-        :root { --bg: #000000; --fg: #ffffff; --muted: #aaaaaa; --line: #ffffff;
-                --accent: #7ce3ff; --accent-fg: #000000; --soft: #111111; }
-      }
     `
   },
 
   warm: {
     description: 'Soft terracotta and oat, rounded shapes, friendly. Signature: pill-shaped buttons and a tinted hero.',
-    css: `
-      --bg: #fffaf5; --fg: #2b1f18; --muted: #7a6659; --line: #efe1d4;
-      --accent: #c2410c; --accent-fg: #fff7f1; --soft: #fdf0e4;
-    `,
+    light: { bg: '#fffaf5', fg: '#2b1f18', muted: '#7a6659', line: '#efe1d4', accent: '#c2410c', accentFg: '#fff7f1', soft: '#fdf0e4' },
+    dark: { bg: '#1a1310', fg: '#f3e6dc', muted: '#b39c8c', line: '#33241c', accent: '#fb923c', accentFg: '#1a1006', soft: '#241811' },
     extra: `
       .btn { border-radius: 999px; padding-inline: 1.6rem; }
       .hero { background: linear-gradient(180deg, var(--soft), transparent); border-radius: 22px; padding-inline: 1.5rem; }
       img, .cta-inner { border-radius: 22px; }
-      @media (prefers-color-scheme: dark) {
-        :root { --bg: #1a1310; --fg: #f3e6dc; --muted: #b39c8c; --line: #33241c;
-                --accent: #fb923c; --accent-fg: #1a1006; --soft: #241811; }
-      }
     `
   },
 
   midnight: {
-    description: 'Dark by default, cyan accent, tight type. Signature: a glowing hairline under the hero.',
-    css: `
-      --bg: #0a0f16; --fg: #dfe7f0; --muted: #8ba0b8; --line: #1d2735;
-      --accent: #22d3ee; --accent-fg: #04222a; --soft: #111a24;
-    `,
+    // Dark for every visitor, like aurora. It used to turn light for a visitor
+    // in light mode, which is most of them: the glow that is its signature had
+    // nothing to glow against, and an accent picked for a page called midnight
+    // became a bright band on a pale one.
+    description: 'Near-black blue in both colour schemes, cyan accent, tight type. Signature: a glowing hairline under the hero.',
+    dark: { bg: '#0a0f16', fg: '#dfe7f0', muted: '#8ba0b8', line: '#1d2735', accent: '#22d3ee', accentFg: '#04222a', soft: '#111a24' },
     extra: `
       body { font-family: ui-sans-serif, system-ui, sans-serif; }
       h1, h2 { letter-spacing: -0.035em; }
       .hero { border-bottom: 1px solid var(--accent); box-shadow: 0 1px 24px -8px var(--accent); }
       .btn-primary { box-shadow: 0 0 24px -6px var(--accent); }
-      /* Dark-first: the light override is the exception, not the default. */
-      @media (prefers-color-scheme: light) {
-        :root { --bg: #f4f8fb; --fg: #0d1620; --muted: #4a6076; --line: #d9e3ed;
-                --accent: #0e7490; --accent-fg: #ffffff; --soft: #e8eff6; }
-      }
     `
   },
 
   aurora: {
     description: 'Deep violet night in both colour schemes, glowing gradients, glassy cards. Signature: a gradient headline over an aurora-lit hero.',
-    css: `
-      --bg: #0b0a1a; --fg: #ecebff; --muted: #a9a7cf; --line: #25234a;
-      --accent: #a78bfa; --accent-fg: #160b33; --soft: rgba(255,255,255,.045);
-    `,
+    dark: { bg: '#0b0a1a', fg: '#ecebff', muted: '#a9a7cf', line: '#25234a', accent: '#a78bfa', accentFg: '#160b33', soft: 'rgba(255,255,255,.045)' },
     extra: `
       .hero {
         background:
@@ -117,10 +100,8 @@ const THEMES = {
 
   swiss: {
     description: 'White, black and signal red, grotesque type, strict left alignment. Signature: oversized tight headlines and a red square before every section heading.',
-    css: `
-      --bg: #ffffff; --fg: #111111; --muted: #555555; --line: #111111;
-      --accent: #e10600; --accent-fg: #ffffff; --soft: #f3f3f3;
-    `,
+    light: { bg: '#ffffff', fg: '#111111', muted: '#555555', line: '#111111', accent: '#e10600', accentFg: '#ffffff', soft: '#f3f3f3' },
+    dark: { bg: '#0f0f0f', fg: '#f4f4f4', muted: '#a8a8a8', line: '#f4f4f4', accent: '#ff3b30', accentFg: '#ffffff', soft: '#1b1b1b' },
     extra: `
       body { font-family: "Helvetica Neue", Helvetica, Arial, "Nimbus Sans", sans-serif; }
       h1 { font-size: clamp(2.6rem, 8vw, 5.4rem); font-weight: 800; letter-spacing: -.055em; line-height: .95; }
@@ -132,19 +113,13 @@ const THEMES = {
       .block { border-bottom: 2px solid var(--line); }
       .btn, img, .cta-inner, .tier, .link-card, .testimonial, .feature, .card, .video-frame { border-radius: 0; }
       .btn-primary { background: var(--accent); border-color: var(--accent); }
-      @media (prefers-color-scheme: dark) {
-        :root { --bg: #0f0f0f; --fg: #f4f4f4; --muted: #a8a8a8; --line: #f4f4f4;
-                --accent: #ff3b30; --accent-fg: #ffffff; --soft: #1b1b1b; }
-      }
     `
   },
 
   playful: {
     description: 'Candy pastels, chunky outlines, rounded type. Signature: hard offset shadows that make buttons and cards look like stickers.',
-    css: `
-      --bg: #fff7fb; --fg: #2a1b3d; --muted: #6c5a80; --line: #2a1b3d;
-      --accent: #7c3aed; --accent-fg: #ffffff; --soft: #fde7f3;
-    `,
+    light: { bg: '#fff7fb', fg: '#2a1b3d', muted: '#6c5a80', line: '#2a1b3d', accent: '#7c3aed', accentFg: '#ffffff', soft: '#fde7f3' },
+    dark: { bg: '#1b1326', fg: '#fbeffd', muted: '#c6b3d6', line: '#fbeffd', accent: '#c4b5fd', accentFg: '#1b1326', soft: '#2a1f3a' },
     extra: `
       body { font-family: ui-rounded, "SF Pro Rounded", "Nunito", "Varela Round", system-ui, sans-serif; }
       h1, h2 { letter-spacing: -.025em; }
@@ -160,8 +135,6 @@ const THEMES = {
       .feature-icon { display: inline-grid; place-items: center; width: 3rem; height: 3rem; border-radius: 14px; background: var(--soft); border: 2px solid var(--line); }
       img { border: 2px solid var(--line); border-radius: 20px; }
       @media (prefers-color-scheme: dark) {
-        :root { --bg: #1b1326; --fg: #fbeffd; --muted: #c6b3d6; --line: #fbeffd;
-                --accent: #c4b5fd; --accent-fg: #1b1326; --soft: #2a1f3a; }
         .btn-ghost { background: transparent; }
         .tier:nth-child(n), .link-card:nth-child(n), .testimonial:nth-child(n) { background: var(--soft); }
       }
@@ -169,10 +142,26 @@ const THEMES = {
   }
 };
 
+const VARS = { bg: '--bg', fg: '--fg', muted: '--muted', line: '--line', accent: '--accent', accentFg: '--accent-fg', soft: '--soft' };
+
+function vars(palette) {
+  return Object.entries(VARS).map(([key, name]) => `${name}: ${palette[key]};`).join(' ');
+}
+
+// A theme's colours as CSS: the palette for light, then the one for dark
+// behind a media query. A theme with a single palette gets no media query, so
+// it is that colour for everyone.
+function paletteCss(theme) {
+  if (!theme.light || !theme.dark) return `:root { ${vars(theme.light || theme.dark)} }`;
+  return `:root { ${vars(theme.light)} }\n@media (prefers-color-scheme: dark) {\n  :root { ${vars(theme.dark)} }\n}`;
+}
+
+// The default theme's palette is the base stylesheet's (styles.js builds its
+// :root from it), so it is not repeated here.
 function themeCss(name) {
   const theme = THEMES[name] || THEMES.default;
-  const vars = theme.css ? `:root {${theme.css}}` : '';
-  return `${vars}\n${theme.extra || ''}`;
+  const palette = theme === THEMES.default ? '' : paletteCss(theme);
+  return `${palette}\n${theme.extra || ''}`;
 }
 
 function normaliseHex(value) {
@@ -207,8 +196,17 @@ function siteCss(meta = {}) {
   return css;
 }
 
-function listThemes() {
-  return Object.entries(THEMES).map(([name, t]) => ({ name, description: t.description }));
+// What an agent needs to choose an accent blind: the page background, the
+// text colour and the theme's own accent, for each colour scheme a visitor
+// may be in. `both` means the theme does not follow the visitor's setting.
+function themeColors(theme) {
+  const pick = p => ({ background: p.bg, text: p.fg, accent: p.accent });
+  if (theme.light && theme.dark) return { light: pick(theme.light), dark: pick(theme.dark) };
+  return { both: pick(theme.light || theme.dark) };
 }
 
-module.exports = { THEMES, themeCss, siteCss, listThemes, normaliseHex };
+function listThemes() {
+  return Object.entries(THEMES).map(([name, t]) => ({ name, description: t.description, colors: themeColors(t) }));
+}
+
+module.exports = { THEMES, themeCss, paletteCss, siteCss, listThemes, themeColors, normaliseHex };
