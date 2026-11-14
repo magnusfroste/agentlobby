@@ -38,6 +38,36 @@ function parseFrontmatter(src) {
   return { meta, body: src.slice(m[0].length) };
 }
 
+// The writer for the header the parser above reads, kept beside it so the two
+// agree on what a line is. Only the lines for the keys given are touched; the
+// rest of the header stays as its author wrote it. null or '' removes a key.
+function setFrontmatter(src, changes) {
+  const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(src);
+  let lines = m ? m[1].split(/\r?\n/) : [];
+  for (const [key, raw] of Object.entries(changes)) {
+    if (!/^[A-Za-z0-9_-]+$/.test(key)) throw new Error(`"${key}" cannot be a frontmatter key: use letters, digits, - and _`);
+    if (raw !== null && typeof raw === 'object') throw new Error(`frontmatter ${key} must be text, a number, true or false, or null to remove it`);
+    const value = raw == null ? '' : String(raw).trim();
+    if (/[\r\n]/.test(value)) throw new Error(`frontmatter ${key} must fit on one line`);
+    const isKey = line => new RegExp(`^\\s*${key}\\s*:`).test(line);
+    const first = lines.findIndex(isKey);
+    // The parser strips one quote from each end, so a value that begins or
+    // ends with one is wrapped to survive the round trip. A line that was
+    // quoted stays quoted.
+    const quoted = /^["']|["']$/.test(value) || (first >= 0 && /^[^:]*:\s*(["']).*\1\s*$/.test(lines[first]));
+    const line = `${key}: ${quoted ? `"${value}"` : value}`;
+    // A key written twice is read as its last line; leave one, so the new
+    // value is the one that counts.
+    lines = lines.filter((l, i) => i === first || !isKey(l));
+    if (!value) { if (first >= 0) lines.splice(first, 1); }
+    else if (first >= 0) lines[first] = line;
+    else lines.push(line);
+  }
+  if (!m) return lines.length ? `---\n${lines.join('\n')}\n---\n\n${src}` : src;
+  const eol = m[0].includes('\r\n') ? '\r\n' : '\n';
+  return `---${eol}${lines.join(eol)}${eol}---${/\n$/.test(m[0]) ? eol : ''}${src.slice(m[0].length)}`;
+}
+
 // ::name{a="b" c=3} — quoted values may contain spaces, bare ones may not.
 function parseAttrs(raw) {
   const attrs = {};
@@ -477,4 +507,4 @@ function renderBlocks(blocks, ctx = {}) {
   }).join('\n');
 }
 
-module.exports = { parseFrontmatter, parseBlocks, parseItems, renderBlocks, escapeHtml, safeUrl, videoEmbed, renderers };
+module.exports = { parseFrontmatter, setFrontmatter, parseBlocks, parseItems, renderBlocks, escapeHtml, safeUrl, videoEmbed, renderers };

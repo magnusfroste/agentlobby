@@ -7,6 +7,35 @@
 // someone else's page and guessing, and a misspelt field vanished silently.
 
 // Every block takes these, on top of its own.
+// The format has a version, so an agent that read it last week can tell what
+// is new without comparing the whole guide. Raise the number and add an entry
+// at the top whenever something an agent can use changes: a block, an
+// attribute, a field, a frontmatter key, a theme or a tool. A test in
+// test/blocks.test.js fails until you do, because a version nobody remembers
+// to raise is worse than none.
+const FORMAT = {
+  version: 2,
+  changes: [
+    {
+      version: 2,
+      date: '2026-11-12',
+      changed: [
+        'New tool patch_site: change a page without resending it, by setting frontmatter keys or replacing one exact piece of text',
+        'Themes list their colours: background, text and accent for each colour scheme, in list_themes and describe_format',
+        'Theme midnight is dark in both colour schemes; it used to turn light for a visitor in light mode',
+        'describe_format carries this version and list of changes'
+      ]
+    },
+    {
+      version: 1,
+      date: '2026-11-12',
+      changed: [
+        'The format as describe_format first published it: 20 blocks; id, tone and align on every block; frontmatter accent, font and tags; 8 themes'
+      ]
+    }
+  ]
+};
+
 const UNIVERSAL_ATTRS = {
   id: 'Anchor name, so a nav link can point at it: id=pricing, then `- Pricing → #pricing`',
   tone: 'Background band across the full width: soft, accent, dark or plain. Alternate tones to give a long page rhythm',
@@ -145,8 +174,8 @@ const ALIASES = { split: 'two-column' };
 const FRONTMATTER = {
   title: 'Page title: the browser tab, search results and link previews. Required',
   description: 'One sentence, under ~160 characters, for search results and previews. Required',
-  theme: 'One of the themes from list_themes',
-  accent: 'Overrides the theme\'s accent colour, as #rgb or #rrggbb',
+  theme: 'One of the themes from list_themes, which gives each theme\'s background, text and accent colours',
+  accent: 'Overrides the theme\'s accent colour, as #rgb or #rrggbb, in both colour schemes — so pick one that stands out on every background the theme lists. Text on the accent turns black or white by itself',
   font: 'Overrides the theme\'s typeface: sans, serif, mono or rounded',
   image: 'Share image URL for link previews (og:image)',
   lang: 'Language code, e.g. en or sv',
@@ -170,4 +199,4 @@ function spec(type) {
   return BLOCKS[ALIASES[type] || type] || null;
 }
 
-module.exports = { BLOCKS, ALIASES, UNIVERSAL_ATTRS, TONES, ALIGNS, FRONTMATTER, FONTS, BUTTON_KINDS, spec };
+module.exports = { FORMAT, BLOCKS, ALIASES, UNIVERSAL_ATTRS, TONES, ALIGNS, FRONTMATTER, FONTS, BUTTON_KINDS, spec };

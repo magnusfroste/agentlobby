@@ -111,6 +111,11 @@ example — is in [`blocks.js`](blocks.js), which is also what the renderer, the
 checker and the `describe_format` tool read. [`examples/showcase.example.com.md`](examples/showcase.example.com.md)
 uses every block once.
 
+The format has a version, kept in `blocks.js` beside the blocks with a list of
+what changed in each. `describe_format` returns both, so an agent that has read
+the format before can tell what is new. A test fails when a block, attribute,
+field, frontmatter key, theme or tool changes without a new version.
+
 Blocks that hold several records take them as markdown lists, so the file still
 reads as prose:
 
@@ -195,10 +200,20 @@ the same page in different colours and an agent picking one is guessing.
 | `editorial` | Drop cap on the first paragraph after a heading |
 | `brutalist` | Heavy rules above every block, no rounded corners |
 | `warm` | Pill buttons and a tinted hero |
-| `midnight` | Dark by default, glowing hairline under the hero |
-| `aurora` | Deep violet night, gradient headline over an aurora-lit hero, glassy cards |
+| `midnight` | Near-black blue in both colour schemes, glowing hairline under the hero |
+| `aurora` | Deep violet night in both colour schemes, gradient headline over an aurora-lit hero, glassy cards |
 | `swiss` | Oversized tight headlines, signal red, a red square before every section heading |
 | `playful` | Candy pastels and chunky outlines; hard offset shadows make buttons and cards look like stickers |
+
+`midnight` and `aurora` are dark for every visitor. The other six follow the
+visitor's colour scheme, so each has a light and a dark palette.
+
+An agent choosing an `accent` cannot see the page, so `list_themes` and
+`describe_format` give each theme's background, text and accent colours as hex,
+per colour scheme. They are read from the palettes in [`themes.js`](themes.js)
+that the stylesheet is built from, so what an agent is told is what a visitor
+gets. An `accent` in frontmatter applies in both schemes: it has to stand out
+on every background the theme lists.
 
 ## Admin
 
@@ -226,13 +241,14 @@ AgentHotel's own endpoint.
 
 | Tool | What it does |
 | --- | --- |
-| `describe_format` | The format itself: frontmatter keys, every block with its attributes, fields and an example, the attributes every block takes, themes. Pass `block` for one |
+| `describe_format` | The format itself: its version and what changed, frontmatter keys, every block with its attributes, fields and an example, the attributes every block takes, themes with their colours. Pass `block` for one |
 | `check_site` | Reviews a page without saving it, with line numbers |
 | `write_site` | Creates or replaces a site. Answers with the URL, whether the hostname is routed here, and the same warnings as `check_site` |
+| `patch_site` | Changes part of a site without resending it: `frontmatter` keys to set (`null` removes one), or `old` and `new` for one exact piece of text that must occur once. Answers like `write_site`, with the review of the whole page |
 | `read_site` | The source and its version, for a write that refuses to clobber |
 | `list_sites` | Every site with title, description, theme, tags, URL and routing. `tag` filters |
 | `delete_site` | Removes one |
-| `list_themes` | Themes with their one-line signature |
+| `list_themes` | Themes with their one-line signature and their background, text and accent colours per colour scheme |
 
 An agent working alone cannot see the page it wrote. Without these it learned
 the format by copying someone else's page, published probe pages to see what
@@ -259,7 +275,10 @@ the author is told.
 Writing a site publishes it, so the endpoint stays closed until
 `LOBBY_API_TOKEN` is set — a world-writable CMS is not a default anyone should
 get by accident. `write_site` replaces the whole file rather than merging, so
-read before you edit.
+read before you edit — or use `patch_site`, which changes only what it is
+given. A replacement that matches nowhere, or in more than one place, is
+refused with the reason rather than guessed at. Both take `if_version` to
+refuse a save over someone else's.
 
 The image ships no sites, so nothing an operator deletes comes back on a
 redeploy, and no example sits under a hostname they do not own.
@@ -284,7 +303,7 @@ Frontmatter carries the rest:
 | `organization` | an `Organization` in the page's JSON-LD, and the page's publisher |
 | `logo` | that organization's logo |
 | `theme` | one of the themes above |
-| `accent` | `#rgb` or `#rrggbb`, overriding the theme's accent; the button text picks black or white to stay readable |
+| `accent` | `#rgb` or `#rrggbb`, overriding the theme's accent in both colour schemes; the button text picks black or white to stay readable |
 | `font` | `sans`, `serif`, `mono` or `rounded`, overriding the theme's typeface |
 | `tags` | comma-separated labels, e.g. `campaign, founders`; `list_sites` filters on them |
 
